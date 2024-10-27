@@ -1,0 +1,237 @@
+#!/usr/bin/env bash
+#
+# preseeder - A trivial Debian preseed templater
+#
+
+set -Eeuo pipefail
+
+################################################################################
+# Constants & Variables
+################################################################################
+
+readonly TMPL_DIR="./tmpl"
+readonly VARS_DIR="./vars"
+readonly SEED_DIR="./preseed"
+
+declare FORCE
+
+################################################################################
+# Functions
+################################################################################
+
+showhelp(){
+  local CMD="$(basename "$0")"
+  local DSC="$(sed -En 's,^# +'$CMD' +- +(.+),\1,p' "$0")"
+
+  cat <<EOF
+
+$CMD - $DSC
+
+USAGE
+
+  $CMD [-t|-e|-p] HOSTGROUP
+
+  $CMD [-f] -D HOSTGROUP
+
+OPTION
+
+  -t  HOSTGROUP  Create a new template named HOSTGROUP.
+
+  -e  HOSTGROUP  Extract all variables used in template files of HOSTGROUP.
+
+  -p  HOSTGROUP  Make preseed files for each HOSTGROUP variable files.
+
+  -D  HOSTGROUP  Delete all HOSTGROUP directories.
+
+  -f             Force deletion without confirmation.
+
+EOF
+} # showhelp()
+
+new_template(){
+  local FROM_DIR="${TMPL_DIR}/default"
+  local DEST_DIR="${TMPL_DIR}/${1}"
+
+  local FROM_PRESEED="${FROM_DIR}/preseed.cfg.tmpl"
+  local DEST_PRESEED="${DEST_DIR}/preseed.cfg.tmpl"
+
+  local FROM_LATECMD="${FROM_DIR}/latecmd.sh.tmpl"
+  local DEST_LATECMD="${DEST_DIR}/latecmd.sh.tmpl"
+
+  # Don't overwrite templates,
+  # stop if any target exists.
+  err_ifexist $DEST_DIR
+  err_ifexist $DEST_PRESEED
+  err_ifexist $DEST_LATECMD
+
+  mkdir $DEST_DIR
+  cp $FROM_PRESEED $DEST_PRESEED
+  cp $FROM_LATECMD $DEST_LATECMD
+
+  (
+    echo "Template files created:"
+    echo
+    find $DEST_DIR -type f
+    echo
+  ) >&2
+}  # new_template()
+
+extract_vars(){
+  local FROM_PRESEED="${TMPL_DIR}/${1}/preseed.cfg.tmpl"
+  local FROM_LATECMD="${TMPL_DIR}/${1}/latecmd.sh.tmpl"
+  local DEST_VAR_DIR="${VARS_DIR}/${1}"
+
+  err_ifnotexist $FROM_PRESEED
+  err_ifnotexist $FROM_LATECMD
+
+  # Let variable files to be overwritten,
+  # no target check.
+  mkdir -p $DEST_VAR_DIR
+  sed -En \
+    -e 's,#.*,,g' \
+    -e 's,.*\$([A-Z0-9_]+).*,\1="",gpi' \
+    -e 's,.*\$\{([A-Z0-9_]+)\}.*,\1="",gpi' \
+    -e 's,.*\$\{([A-Z0-9_]+):.([^}]+)\}.*,\1="\2",gpi' \
+    $FROM_PRESEED \
+    $FROM_LATECMD \
+  | sed -E '/\<(iflabel|reusemethod)\>/d' \
+  | sort | uniq \
+  > "${DEST_VAR_DIR}/var"
+
+  (
+    echo "Variable file created:"
+    echo
+    find $DEST_VAR_DIR -type f
+    echo
+  ) >&2
+} # extract_vars()
+
+gen_preseed(){
+  local  FROM_PRESEED="${TMPL_DIR}/${1}/preseed.cfg.tmpl"
+  local  FROM_LATECMD="${TMPL_DIR}/${1}/latecmd.sh.tmpl"
+  local  FROM_VAR_DIR="${VARS_DIR}/${1}"
+  local DEST_SEED_DIR="${SEED_DIR}/${1}"
+
+  # Restore preseed variables
+  local     iflabel="iflabel"
+  local reusemethod="reusemethod"
+
+  # Let preseed files to be overwritten,
+  # no target check.
+  mkdir -p $DEST_SEED_DIR
+  #for var in $(find $FROM_VAR_DIR -type f) ; do
+  for var in $(ls $FROM_VAR_DIR) ; do
+    if [ $var == "var" ] ; then
+      continue
+    fi
+
+    # Create a subdir for each variable file
+    mkdir -p "${DEST_SEED_DIR}/${var}"
+
+    # Protect variable files sourcing in a subshell
+    (
+      . "${FROM_VAR_DIR}/${var}"
+
+      # Generate preseed.cfg
+      eval "cat <<EOF
+$(< $FROM_PRESEED)
+EOF" > "${DEST_SEED_DIR}/${var}/preseed.cfg"
+
+      # Generate latecmd.sh
+      eval "cat <<EOF
+$(< $FROM_LATECMD)
+EOF" > "${DEST_SEED_DIR}/${var}/latecmd.sh"
+    )
+  done
+
+  (
+    echo "Preseed files created:"
+    echo
+    find $DEST_SEED_DIR -type f
+    echo
+  ) >&2
+} # gen_preseed()
+
+del_hostgroup(){
+  local HOSTGROUP="$1"
+  local HOSTFILES="$(
+    find . -path "*/${HOSTGROUP}/*"
+    find . -name   "${HOSTGROUP}" -type d
+  )"
+  local FORCE="${2:-0}"
+
+  del_files(){
+    find . -path "*/${HOSTGROUP}/*" -delete
+    find . -name   "${HOSTGROUP}" -type d -delete
+  }
+
+  if [ -z "$HOSTFILES" ] ; then
+    echo "No $HOSTGROUP files found."
+    exit 1
+  fi
+
+  if [ $FORCE -eq 1 ] ; then
+    del_files
+  else
+    echo "Delete these files and directories?"
+    echo
+    echo "$HOSTFILES"
+    echo
+    read -t 10 -p "Confirm (y/N)? " ANS
+
+    case $ANS in
+      (y|Y) del_files ;;
+        (*) echo -e "\nNo files deleted." >&2 ;;
+    esac
+  fi
+} # del_hostgroup()
+
+err_ifexist(){
+  local FILEORDIR="$1"
+
+  if [ -e "$FILEORDIR" ] ; then
+    echo "Error: $FILEORDIR already exists." >&2
+    exit 1
+  fi
+} # err_ifexist()
+
+err_ifnotexist(){
+  local FILEORDIR="$1"
+
+  if [ ! -e "$FILEORDIR" ] ; then
+    echo "Error: $FILEORDIR does not exist." >&2
+    exit 1
+  fi
+} # err_ifnotexist()
+
+################################################################################
+# Main
+################################################################################
+
+case $# in
+  (0) showhelp ; exit 0 ;; # no argument at all
+  (*)
+    case $1 in
+      (-*)
+        while getopts :t:e:p:fD:h optchar ; do
+          case $optchar in
+            (t) new_template $OPTARG ; break ;;
+            (e) extract_vars $OPTARG ; break ;;
+            (p) gen_preseed  $OPTARG ; break ;;
+            (f) FORCE=1 ;;
+            (D) del_hostgroup $OPTARG ${FORCE:-0} ; break ;;
+            (h) showhelp ; exit 0 ;;
+            (*) showhelp ; exit 1 ;; # wrong option
+          esac
+        done
+        ;;
+      (*) # no option, but argument given
+        new_template $1
+        extract_vars $1
+        ;;
+    esac
+    ;;
+esac
+
+# vim:ft=bash:
+

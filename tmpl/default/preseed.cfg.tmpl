@@ -1,0 +1,140 @@
+################################################################################
+#
+# Simple Debian preseed
+#
+################################################################################
+
+#===============================================================================
+# Locale & keyboard
+#===============================================================================
+
+d-i debian-installer/locale string ${LOCALE}
+d-i keyboard-configuration/xkb-keymap select ${KEYBOARD}
+d-i netcfg/choose_interface select auto
+
+#===============================================================================
+# Hostname & domain
+#===============================================================================
+
+# Hostname & domain might have been set first by DHCP,
+# see: https://unix.stackexchange.com/questions/106614/preseed-cfg-ignoring-hostname-setting
+d-i netcfg/get_hostname string ${HOSTNAME}
+d-i netcfg/get_domain string ${DOMAIN}
+
+#===============================================================================
+# APT mirror
+#===============================================================================
+
+#d-i mirror/protocol string http
+d-i mirror/country string ${MIRROR_COUNTRY}
+d-i mirror/http/hostname string deb.debian.org
+d-i mirror/http/directory string /debian
+d-i mirror/http/proxy string
+
+#===============================================================================
+# Users & passwords
+#
+# Make password with openssl passwd -6
+#===============================================================================
+
+# root
+d-i passwd/root-login boolean false
+d-i passwd/root-password-crypted password ${PASSWD_HASH_ROOT}
+
+# default sudoer
+d-i passwd/username string ${USERNAME}
+d-i passwd/user-fullname string ${FULLNAME}
+d-i passwd/user-password-crypted password ${PASSWD_HASH_USER}
+
+#===============================================================================
+# Time
+#===============================================================================
+
+d-i clock-setup/utc boolean true
+d-i time/zone string ${TIMEZONE}
+d-i clock-setup/ntp boolean true
+
+#===============================================================================
+# Disk partition
+#
+# See: https://salsa.debian.org/installer-team/debian-installer/-/blob/master/doc/devel/partman-auto-recipe.txt
+#===============================================================================
+
+#-------------------------------------------------------------------------------
+# Automatic
+#
+# swap is the latest partition, cumbersome for later disk enlargement in a VM
+#-------------------------------------------------------------------------------
+
+#d-i partman-auto/method string regular
+#d-i partman-auto/choose_recipe select atomic
+
+#-------------------------------------------------------------------------------
+# Custom
+#
+# swap is before the root partition, easier for later disk enlargement in a VM
+#-------------------------------------------------------------------------------
+
+# Do NOT redefine $iflabel or $reusemethod !!!
+# Do not use XFS with armhf !!!
+d-i partman-auto/method string regular
+d-i partman-auto/expert_recipe string        \
+  boot-root ::                               \
+    512 512 1024 free                        \
+      ${iflabel:-iflabel}{ gpt }             \
+      ${reusemethod:-reusemethod}{ }         \
+      method{ efi }                          \
+      format{ }                              \
+    .                                        \
+    512 1024 50% linux-swap                  \
+      method{ swap }                         \
+      format{ }                              \
+    .                                        \
+    500 10000 1000000000 ${FILESYSTEM:-ext4} \
+      method{ format }                       \
+      format{ }                              \
+      use_filesystem{ }                      \
+      filesystem{ ${FILESYSTEM:-ext4} }      \
+      mountpoint{ / }                        \
+    .                                        \
+
+# Keep the blank line above me!
+
+#-------------------------------------------------------------------------------
+# General
+#-------------------------------------------------------------------------------
+
+d-i partman-partitioning/confirm_write_new_label boolean true
+d-i partman/choose_partition select finish
+d-i partman/confirm boolean true
+d-i partman/confirm_nooverwrite boolean true
+
+#===============================================================================
+# Package installation
+#===============================================================================
+
+d-i apt-setup/cdrom/set-first boolean false
+tasksel tasksel/first multiselect standard, ssh-server
+d-i pkgsel/upgrade select full-upgrade
+popularity-contest popularity-contest/participate boolean false
+d-i pkgsel/include string ${PACKAGES:-build-essential git curl jq htop vim ripgrep bat}
+
+#===============================================================================
+# Bootloader
+#===============================================================================
+
+d-i grub-installer/only_debian boolean true
+d-i grub-installer/with_other_os boolean false
+d-i finish-install/reboot_in_progress note
+
+#===============================================================================
+# Custom commands
+#===============================================================================
+
+# Don't use pipe here!
+d-i preseed/late_command string \
+  in-target curl -Lo /tmp/latecmd.sh ${LATECMD_URL} ;\
+  in-target sh /tmp/latecmd.sh
+
+# vim:syntax=sh:
+

@@ -1,0 +1,27 @@
+#/bin/sh
+#
+# Debian preseed late commands
+#
+
+# Get SSH pubkey from GitHub
+mkdir -p /home/${USERNAME}/.ssh
+curl -Lo \
+  /home/${USERNAME}/.ssh/authorized_keys \
+  https://github.com/${GH_USERNAME}.keys
+chown -R \
+  ${USERNAME}:${USERNAME} \
+  /home/${USERNAME}/.ssh
+
+# Remove cdrom from fstab
+sed -i /cdrom/d /etc/fstab
+
+# Set vim as the default editor
+update-alternatives --set editor /usr/bin/vim.basic
+
+# Set nopasswd sudo
+mkdir -p /etc/sudoers.d
+echo 'bydefault	ALL=(ALL:ALL) NOPASSWD: ALL' > /etc/sudoers.d/${USERNAME}
+chmod 400 /etc/sudoers.d/${USERNAME}
+
+# vim:syntax=sh:
+

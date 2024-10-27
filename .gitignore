@@ -1,0 +1,13 @@
+.DS_Store
+[Tt]humbs.db
+preseed/
+vars/
+bak/
+*.bak
+*.sh
+*.cfg
+
+# ignore everything inside tmpl,
+# except the default directory
+tmpl/*
+!tmpl/default/
