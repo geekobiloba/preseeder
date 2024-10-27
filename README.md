@@ -1,4 +1,4 @@
-#   A trivial Debian preseed templater
+#   Trivial Debian preseed templater
 
 To simplify Debian automated installation
 with [preseed](https://wiki.debian.org/DebianInstaller/Preseed),
@@ -54,6 +54,7 @@ Hopefully, it can help you, too.
     USERNAME="geekobiloba"
     PASSWD_HASH_USER='$6$RXZ9ccXz07zIlcWK$Q5HMTePavdX9L9HBQWrQtQLcaD6Qz8494CdCBsaPqtfJJVebrGspSYeAFx15X5RzBhdg0rGywEuiqgn4LQ.kW0'
     PASSWD_HASH_ROOT='$6$RXZ9ccXz07zIlcWK$Q5HMTePavdX9L9HBQWrQtQLcaD6Qz8494CdCBsaPqtfJJVebrGspSYeAFx15X5RzBhdg0rGywEuiqgn4LQ.kW0'
+    NTP_SERVER="time.bmkg.go.id"
     LATECMD_URL="http://192.168.111.111:8000/homelab/host-01/latecmd.sh"
     ```
 

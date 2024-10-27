@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# preseeder - A trivial Debian preseed templater
+# preseeder - Trivial Debian preseed templater
 #
 
 set -Eeuo pipefail
@@ -88,10 +88,10 @@ extract_vars(){
   # no target check.
   mkdir -p $DEST_VAR_DIR
   sed -En \
-    -e 's,#.*,,g' \
+    -e 's,^\s*#.*,,g' \
     -e 's,.*\$([A-Z0-9_]+).*,\1="",gpi' \
     -e 's,.*\$\{([A-Z0-9_]+)\}.*,\1="",gpi' \
-    -e 's,.*\$\{([A-Z0-9_]+):.([^}]+)\}.*,\1="\2",gpi' \
+    -e 's,.*\$\{([A-Z0-9_]+):[-=]([^}]+)\}.*,\1="\2",gpi' \
     $FROM_PRESEED \
     $FROM_LATECMD \
   | sed -E '/\<(iflabel|reusemethod)\>/d' \
@@ -133,14 +133,17 @@ gen_preseed(){
       . "${FROM_VAR_DIR}/${var}"
 
       # Generate preseed.cfg
-      eval "cat <<EOF
+      #
+      # Do NOT use EOF here,
+      # to prevent interferance with heredecos in latecmd.sh.
+      eval "cat <<HOPEFULLY_SAFE_EOF
 $(< $FROM_PRESEED)
-EOF" > "${DEST_SEED_DIR}/${var}/preseed.cfg"
+HOPEFULLY_SAFE_EOF" > "${DEST_SEED_DIR}/${var}/preseed.cfg"
 
       # Generate latecmd.sh
-      eval "cat <<EOF
+      eval "cat <<HOPEFULLY_SAFE_EOF
 $(< $FROM_LATECMD)
-EOF" > "${DEST_SEED_DIR}/${var}/latecmd.sh"
+HOPEFULLY_SAFE_EOF" > "${DEST_SEED_DIR}/${var}/latecmd.sh"
     )
   done
 

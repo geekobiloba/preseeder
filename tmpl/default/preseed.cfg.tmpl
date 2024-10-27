@@ -10,7 +10,6 @@
 
 d-i debian-installer/locale string ${LOCALE}
 d-i keyboard-configuration/xkb-keymap select ${KEYBOARD}
-d-i netcfg/choose_interface select auto
 
 #===============================================================================
 # Hostname & domain
@@ -18,6 +17,9 @@ d-i netcfg/choose_interface select auto
 
 # Hostname & domain might have been set first by DHCP,
 # see: https://unix.stackexchange.com/questions/106614/preseed-cfg-ignoring-hostname-setting
+d-i netcfg/choose_interface select auto
+d-i netcfg/get_hostname string unassigned-hostname
+d-i netcfg/get_domain string unassigned-domain
 d-i netcfg/get_hostname string ${HOSTNAME}
 d-i netcfg/get_domain string ${DOMAIN}
 
@@ -63,7 +65,7 @@ d-i clock-setup/ntp boolean true
 #-------------------------------------------------------------------------------
 # Automatic
 #
-# swap is the latest partition, cumbersome for later disk enlargement in a VM
+# swap is the latest partition, cumbersome for later disk enlargement
 #-------------------------------------------------------------------------------
 
 #d-i partman-auto/method string regular
@@ -72,11 +74,11 @@ d-i clock-setup/ntp boolean true
 #-------------------------------------------------------------------------------
 # Custom
 #
-# swap is before the root partition, easier for later disk enlargement in a VM
+# swap is before the root partition, easier for later disk enlargement
 #-------------------------------------------------------------------------------
 
 # Do NOT redefine $iflabel or $reusemethod !!!
-# Do not use XFS with armhf !!!
+# Don't use XFS with armhf!
 d-i partman-auto/method string regular
 d-i partman-auto/expert_recipe string        \
   boot-root ::                               \

@@ -3,24 +3,103 @@
 # Debian preseed late commands
 #
 
+#===============================================================================
+# SSH
+#===============================================================================
+
+# SSH
+cat <<EOF > /etc/ssh/sshd_config.d/nopasswd.conf
+PermitRootLogin              no
+AuthorizedKeysFile           .ssh/authorized_keys
+PubkeyAuthentication         yes
+PasswordAuthentication       no
+KbdInteractiveAuthentication no
+EOF
+
 # Get SSH pubkey from GitHub
 mkdir -p /home/${USERNAME}/.ssh
-curl -Lo \
-  /home/${USERNAME}/.ssh/authorized_keys \
+curl -Lo /home/${USERNAME}/.ssh/authorized_keys \
   https://github.com/${GH_USERNAME}.keys
-chown -R \
-  ${USERNAME}:${USERNAME} \
-  /home/${USERNAME}/.ssh
+chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}/.ssh
+
+#===============================================================================
+# fstab
+#===============================================================================
 
 # Remove cdrom from fstab
 sed -i /cdrom/d /etc/fstab
 
+#===============================================================================
+# NTP
+#===============================================================================
+
+# Set NTP server address
+sed -Ei 's,^#*(NTP=).*,\1'${NTP_SERVER},g /etc/systemd/timesyncd.conf
+
+#===============================================================================
+# Hostname
+#===============================================================================
+
+# Set hostname no matter what
+echo ${HOSTNAME}.${DOMAIN} > /etc/hostname
+sed -Ei 's,(127\.0\.1\.1\s+).*,\1'"${HOSTNAME}.${DOMAIN} ${HOSTNAME},g" \
+  /etc/hosts
+
+#===============================================================================
+# Bash
+#===============================================================================
+
+# Set case-insensitive tab completion
+echo 'set completion-ignore-case on' > /etc/inputrc
+
+# Set aliases
+cat <<EOF > /etc/profile.d/aliases.sh
+alias    rm="rm -i"
+alias    mv="mv -i"
+alias    cp="cp -i"
+alias    la='ls -A'
+alias    ll='ls -halF'
+alias    ip="ip --color=auto"
+alias   cls="clear"
+alias   sed="sed -E"
+alias  grep="grep -E --color=auto"
+alias  sudo="sudo "
+alias xargs="xargs "
+EOF
+
+#===============================================================================
+# Vim
+#===============================================================================
+
 # Set vim as the default editor
 update-alternatives --set editor /usr/bin/vim.basic
 
+# Set global vimrc
+cat <<EOF > /etc/vim/vimrc.local
+set nocompatible
+set backupcopy=yes
+set backspace=2
+set tabstop=2
+set shiftwidth=2
+set expandtab
+set ignorecase
+set smartcase
+set fileencoding=utf-8
+set encoding=utf-8
+set background=dark
+set laststatus=2
+set mouse=a
+set number
+syntax on
+colorscheme desert
+EOF
+
+#===============================================================================
+# sudo
+#===============================================================================
+
 # Set nopasswd sudo
-mkdir -p /etc/sudoers.d
-echo 'bydefault	ALL=(ALL:ALL) NOPASSWD: ALL' > /etc/sudoers.d/${USERNAME}
+echo "${USERNAME} ALL=(ALL:ALL) NOPASSWD: ALL" > /etc/sudoers.d/${USERNAME}
 chmod 400 /etc/sudoers.d/${USERNAME}
 
 # vim:syntax=sh:
