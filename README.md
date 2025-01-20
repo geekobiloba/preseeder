@@ -142,7 +142,7 @@ or using a [DHCP server](https://www.growse.com/2023/05/05/automated-debian-inst
     to compile stuff for embedded devices,
     usually runs OpenWrt.
 
--   _Is there any caveats?_
+-   _Is there any caveats_
 
     Yes.
     This tool doesn't check preseed files validity.
